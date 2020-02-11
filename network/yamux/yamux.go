@@ -10,13 +10,14 @@ import (
 )
 
 type logConn struct {
+	Name string
 	net.Conn
 }
 
 func (l *logConn) Read(b []byte) (n int, err error) {
 	n, err = l.Conn.Read(b)
 
-	fmt.Printf("Read: %d; %v\n%s\n", n, err, hex.Dump(b[:n]))
+	fmt.Printf("[%s] Read: %d; %v\n%s\n", l.Name, n, err, hex.Dump(b[:n]))
 
 	return n, err
 }
@@ -24,15 +25,14 @@ func (l *logConn) Read(b []byte) (n int, err error) {
 func (l *logConn) Write(b []byte) (n int, err error) {
 	n, err = l.Conn.Write(b)
 
-	fmt.Printf("Write: %d; %v\n%s\n", n, err, hex.Dump(b[:n]))
+	fmt.Printf("[%s] Write: %d; %v\n%s\n", l.Name, n, err, hex.Dump(b[:n]))
 
 	return n, err
 }
 
 func main() {
 	srv, cli := net.Pipe()
-
-	srv, cli = &logConn{srv}, &logConn{cli}
+	srv, cli = &logConn{"Server", srv}, &logConn{"Client", cli}
 
 	config := yamux.DefaultConfig()
 	server, err := yamux.Server(srv, config)
