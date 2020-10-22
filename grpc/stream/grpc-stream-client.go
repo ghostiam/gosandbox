@@ -29,23 +29,31 @@ func main() {
 
 	client := stream.NewChatServiceClient(conn)
 
-	chat, err := client.Chat(context.Background())
-	if err != nil {
-		log.Fatalf("failed to connect to chat: %v", err)
-	}
-	defer chat.CloseSend()
+	for {
+		func() {
+			chat, err := client.Chat(context.Background())
+			if err != nil {
+				log.Printf("failed to connect to chat: %v", err)
+				return
+			}
+			defer chat.CloseSend()
 
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter username: ")
-	username, err := reader.ReadString('\n')
-	if err != nil {
-		log.Fatalf("failed readline from console: %v", err)
-	}
-	username = strings.TrimSpace(username)
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Enter username: ")
+			username, err := reader.ReadString('\n')
+			if err != nil {
+				log.Printf("failed readline from console: %v", err)
+				return
+			}
+			username = strings.TrimSpace(username)
 
-	err = chatHandler(chat, username)
-	if err != nil {
-		log.Fatalf("failed chatHandler: %v", err)
+			err = chatHandler(chat, username)
+			if err != nil {
+				log.Printf("failed chatHandler: %v", err)
+				return
+			}
+		}()
+		time.Sleep(time.Second)
 	}
 }
 

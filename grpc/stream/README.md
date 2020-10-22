@@ -4,7 +4,7 @@
 
 Start server:
 ```bash
-go run gprc-stream-server.go
+go run grpc-stream-server.go
 ```
 
 Start a few client(in other terminals):

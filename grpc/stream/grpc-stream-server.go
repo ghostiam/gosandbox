@@ -67,8 +67,8 @@ func (s *chatServer) sendBroadcast(msg *stream.ChatMessage) {
 	}
 }
 
-func (s *chatServer) Chat(chat stream.ChatService_ChatServer) error {
-	peerInfo, ok := peer.FromContext(chat.Context())
+func (s *chatServer) Chat(server stream.ChatService_ChatServer) error {
+	peerInfo, ok := peer.FromContext(server.Context())
 	if !ok {
 		return errors.New("failed get peer info")
 	}
@@ -82,24 +82,30 @@ func (s *chatServer) Chat(chat stream.ChatService_ChatServer) error {
 		s.clientRemove(peerAddr)
 	}()
 
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 
 	go func() {
 		for {
-			message, err := chat.Recv()
+			message, err := server.Recv()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					time.Sleep(100 * time.Millisecond)
 					continue
 				}
 
-				errCh <- fmt.Errorf("chat.Recv: %w", err)
+				errCh <- fmt.Errorf("server.Recv: %w", err)
 				return
 			}
 
 			fmt.Printf("[%s]: %s\n", message.Username, message.Message)
 			s.sendBroadcast(message)
 		}
+	}()
+
+	go func() {
+		<-server.Context().Done()
+		fmt.Printf("done: %v\n", server.Context().Err())
+		errCh <- server.Context().Err()
 	}()
 
 	go func() {
@@ -110,9 +116,9 @@ func (s *chatServer) Chat(chat stream.ChatService_ChatServer) error {
 				return
 			}
 
-			err := chat.Send(msg)
+			err := server.Send(msg)
 			if err != nil {
-				errCh <- fmt.Errorf("chat.Send: %w", err)
+				errCh <- fmt.Errorf("server.Send: %w", err)
 				return
 			}
 		}
