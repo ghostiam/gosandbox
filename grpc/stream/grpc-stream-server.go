@@ -39,6 +39,8 @@ func main() {
 type chatServer struct {
 	clientMutex sync.Mutex
 	client      map[net.Addr]chan *stream.ChatMessage
+	//
+	stream.UnimplementedChatServiceServer
 }
 
 func (s *chatServer) clientAdd(addr net.Addr) <-chan *stream.ChatMessage {
@@ -68,7 +70,8 @@ func (s *chatServer) sendBroadcast(msg *stream.ChatMessage) {
 }
 
 func (s *chatServer) Chat(server stream.ChatService_ChatServer) error {
-	peerInfo, ok := peer.FromContext(server.Context())
+	ctx := server.Context()
+	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return errors.New("failed get peer info")
 	}
@@ -103,23 +106,24 @@ func (s *chatServer) Chat(server stream.ChatService_ChatServer) error {
 	}()
 
 	go func() {
-		<-server.Context().Done()
-		fmt.Printf("done: %v\n", server.Context().Err())
-		errCh <- server.Context().Err()
-	}()
-
-	go func() {
 		for {
-			msg, ok := <-clientCh
-			if !ok {
-				errCh <- errors.New("clientCh closed")
+			select {
+			case <-ctx.Done():
+				fmt.Printf("done: %v\n", ctx.Err())
+				errCh <- ctx.Err()
 				return
-			}
 
-			err := server.Send(msg)
-			if err != nil {
-				errCh <- fmt.Errorf("server.Send: %w", err)
-				return
+			case msg, ok := <-clientCh:
+				if !ok {
+					fmt.Printf("clientCh closed\n")
+					errCh <- nil
+					return
+				}
+				err := server.Send(msg)
+				if err != nil {
+					errCh <- fmt.Errorf("send from server to client: %w", err)
+					return
+				}
 			}
 		}
 	}()
